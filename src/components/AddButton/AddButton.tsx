@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {DraftBlockType, EditorState} from 'draft-js';
+import {DraftBlockType, EditorState, SelectionState} from 'draft-js';
 
 import {getSelectedBlockNode} from '../../util/selection';
 import {SideButton} from '../../MediumDraftEditor';
@@ -25,7 +25,7 @@ interface AddButtonState {
  * Implementation of the medium-link side `+` button to insert various rich blocks
  * like Images/Embeds/Videos.
  */
-export class AddButton extends React.Component<AddButtonProps, AddButtonState> {
+export class AddButton extends React.PureComponent<AddButtonProps, AddButtonState> {
 
     public state: Readonly<AddButtonState> = {
         visible: false,
@@ -36,6 +36,14 @@ export class AddButton extends React.Component<AddButtonProps, AddButtonState> {
     };
 
     private node: HTMLElement = null;
+
+    public componentDidMount() {
+        document.addEventListener('mousedown', this.fastBlockFind);
+    }
+
+    public componentWillUnmount(): void {
+        document.removeEventListener('mousedown', this.fastBlockFind);
+    }
 
     // To show + button only when text length == 0
     public static getDerivedStateFromProps(newProps: AddButtonProps) {
@@ -145,5 +153,31 @@ export class AddButton extends React.Component<AddButtonProps, AddButtonState> {
             // back previous window state
             window.scrollTo(x, y);
         });
+    }
+
+    private fastBlockFind = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        const attr = target.getAttribute('data-offset-key');
+
+        if (attr) {
+
+            const blockSearch = /^[a-z0-9]+/.exec(attr);
+
+            if (blockSearch && blockSearch[0]) {
+                const blockKey = blockSearch[0];
+                const block = this.props.editorState.getCurrentContent().getBlockForKey(blockKey);
+
+                if (block && block.getText().length === 0) {
+                    const newSelection = new SelectionState({
+                        anchorKey: blockKey,
+                        anchorOffset: 0,
+                        focusKey: blockKey,
+                        focusOffset: 0
+                    });
+
+                    this.props.setEditorState(EditorState.forceSelection(this.props.getEditorState(), newSelection));
+                }
+            }
+        }
     }
 }
